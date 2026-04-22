@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>できるホストは知っている!? 東京単価検定</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="できるホストは知っている!? 東京単価検定">
+<meta property="og:description" content="東京の民泊物件を見て、1泊の単価を当てるゲーム。あなたのホスト価格センスを試してみて！">
+<meta property="og:url" content="https://tokyo-minpakuhost-price-game.netlify.app/">
+<meta property="og:image" content="https://tokyo-minpakuhost-price-game.netlify.app/ogp.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="できるホストは知っている!? 東京単価検定">
+<meta name="twitter:description" content="東京の民泊物件を見て、1泊の単価を当てるゲーム。あなたのホスト価格センスを試してみて！">
+<meta name="twitter:image" content="https://tokyo-minpakuhost-price-game.netlify.app/ogp.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --bg: #FFF6EC;
+  --surface: #FFFFFF;
+  --card: #FFFFFF;
+  --border: #F0E4D4;
+  --text: #2A2520;
+  --muted: #A09080;
+  --accent: #FF5C38;
+  --accent2: #FF9500;
+  --teal: #18C9B0;
+  --blue: #4080FF;
+  --purple: #9B5FFF;
+  --pink: #FF6BA8;
+  --green: #2CC48C;
+  --gold: #F0A820;
+  --sans: 'M PLUS Rounded 1c', sans-serif;
+  --mono: 'Space Mono', monospace;
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 24px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+/* ─── HEADER ─── */
+.header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(255,246,236,0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 2px solid var(--border);
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px; gap: 16px;
+}
+.header-title {
+  font-size: 18px; font-weight: 900;
+  letter-spacing: -0.01em; white-space: nowrap;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.header-title .short { display: none; }
+@media (max-width: 600px) {
+  .header-title .full { display: none; }
+  .header-title .short { display: inline; }
+  .header-title { font-size: 15px; }
+  .header-progress { max-width: 120px; }
+  .score-value { font-size: 20px; }
+}
+.header-progress { flex: 1; max-width: 280px; }
+.progress-label {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--muted);
+  font-family: var(--mono); margin-bottom: 4px;
+}
+.progress-bar {
+  height: 8px; background: var(--border);
+  border-radius: 99px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2), #FFD000);
+  border-radius: 99px;
+  transition: width 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+.header-score { text-align: right; }
+.score-label { font-size: 10px; color: var(--muted); font-weight: 700; letter-spacing: 0.1em; }
+.score-value {
+  font-family: var(--mono); font-size: 24px; font-weight: 700;
+  color: var(--accent); line-height: 1;
+}
+
+/* ─── GAME WRAP ─── */
+.game-wrap { max-width: 880px; margin: 0 auto; padding: 20px 16px 60px; }
+
+/* PHOTO */
+.photo-wrap {
+  position: relative; width: 100%; height: 340px;
+  border-radius: var(--r-lg); overflow: hidden;
+  background: #F0E8DC; margin-bottom: 16px;
+  box-shadow: 0 8px 32px rgba(255,92,56,0.12);
+}
+.photo-wrap img {
+  width: 100%; height: 100%; object-fit: cover;
+  display: block; opacity: 0; transition: opacity 0.5s ease;
+}
+.photo-wrap img.loaded { opacity: 1; }
+.photo-loading {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px; color: var(--muted); font-size: 13px; font-weight: 700;
+  background: #F0E8DC; z-index: 1; transition: opacity 0.4s;
+}
+.photo-loading.hidden { opacity: 0; pointer-events: none; }
+.photo-loading-spinner {
+  width: 22px; height: 22px;
+  border: 3px solid #E0D8D0;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.photo-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(20,15,10,0.8));
+  padding: 36px 20px 18px;
+}
+.listing-name {
+  font-size: 16px; font-weight: 800; color: #fff; line-height: 1.3;
+}
+
+/* CONTENT GRID */
+.content-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 14px; margin-bottom: 14px;
+}
+
+/* INFO CARD */
+.info-card {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+}
+.info-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--border);
+  gap: 8px;
+}
+.info-row:last-child { border-bottom: none; }
+.info-label {
+  font-size: 11px; color: var(--muted); font-weight: 700;
+  letter-spacing: 0.04em; white-space: nowrap; flex-shrink: 0;
+}
+.info-value { font-size: 13px; font-weight: 800; color: var(--text); text-align: right; }
+.info-value.c-teal { color: var(--teal); }
+.info-value.c-gold { color: var(--gold); }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 800; padding: 3px 9px;
+  border-radius: 99px; letter-spacing: 0.04em;
+}
+.badge-superhost { background: linear-gradient(135deg, #FFF0C0, #FFD860); color: #7A5000; }
+.badge-type { background: #F0EEFF; color: var(--purple); }
+
+.occ-wrap { display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: right; }
+.occ-pct { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--teal); }
+.occ-bar-track {
+  height: 8px; background: var(--border);
+  border-radius: 99px; overflow: hidden;
+}
+.occ-bar-fill {
+  height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, var(--teal), var(--green));
+  transition: width 0.9s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* MAP */
+.map-card {
+  background: var(--card); border: 2px solid var(--border);
+  border-radius: var(--r-md); overflow: hidden; position: relative;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+}
+#map { width: 100%; height: 100%; min-height: 260px; }
+.map-notice {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  background: rgba(255,255,255,0.88); color: var(--muted);
+  font-size: 10px; font-weight: 700; padding: 3px 12px;
+  border-radius: 99px; white-space: nowrap; z-index: 500;
+  backdrop-filter: blur(4px); border: 1px solid var(--border);
+}
+
+/* ANSWER CARD */
+.answer-card {
+  background: var(--card); border: 2px solid var(--border);
+  border-radius: var(--r-md); padding: 24px 22px 20px;
+  box-shadow: 0 4px 24px rgba(255,92,56,0.08);
+}
+.answer-title {
+  font-size: 14px; font-weight: 700; color: var(--muted);
+  text-align: center; margin-bottom: 16px;
+}
+.answer-title strong { color: var(--text); font-size: 16px; }
+
+.price-display { text-align: center; margin-bottom: 16px; line-height: 1; }
+.price-currency { font-family: var(--mono); font-size: 24px; color: var(--muted); }
+.price-number {
+  font-family: var(--mono); font-size: 56px; font-weight: 700;
+  color: var(--accent); letter-spacing: -0.03em;
+}
+.price-unit { font-size: 14px; color: var(--muted); margin-left: 4px; font-weight: 700; }
+
+.slider-range {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--muted); font-family: var(--mono);
+  margin-bottom: 6px; font-weight: 700;
+}
+input[type=range] {
+  -webkit-appearance: none; width: 100%; height: 8px;
+  background: var(--border); border-radius: 99px; outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 28px; height: 28px;
+  border-radius: 50%; cursor: pointer;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow: 0 2px 12px rgba(255,92,56,0.4), 0 0 0 4px rgba(255,92,56,0.15);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+input[type=range]::-webkit-slider-thumb:hover {
+  box-shadow: 0 2px 16px rgba(255,92,56,0.6), 0 0 0 8px rgba(255,92,56,0.12);
+  transform: scale(1.1);
+}
+
+.btn-answer {
+  display: block; width: 100%; padding: 16px; margin-top: 18px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff; font-family: var(--sans); font-size: 17px; font-weight: 900;
+  letter-spacing: 0.06em; border: none; border-radius: var(--r-sm);
+  cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 6px 20px rgba(255,92,56,0.35), 0 2px 0 rgba(0,0,0,0.1) inset;
+}
+.btn-answer:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(255,92,56,0.45); }
+.btn-answer:active { transform: translateY(1px); }
+.btn-answer:disabled {
+  background: var(--border); color: var(--muted); box-shadow: none; cursor: not-allowed; transform: none;
+}
+
+/* ─── RESULT OVERLAY ─── */
+.result-overlay {
+  display: none; position: fixed; inset: 0; z-index: 600;
+  background: rgba(42,37,32,0.7); backdrop-filter: blur(8px);
+  align-items: flex-end; justify-content: center; padding: 12px;
+  overflow-y: auto;
+}
+.result-overlay.visible { display: flex; animation: fadeIn 0.25s ease; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp {
+  from { transform: translateY(48px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pop {
+  0% { transform: scale(0.7); opacity: 0; }
+  70% { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.result-panel {
+  background: var(--bg); border: 2px solid var(--border);
+  border-radius: var(--r-lg); padding: 0;
+  width: 100%; max-width: 520px;
+  animation: slideUp 0.35s cubic-bezier(0.16,1,0.3,1);
+  margin-bottom: 12px; overflow: hidden;
+}
+
+/* Property summary inside result */
+.result-prop-header {
+  background: var(--card); padding: 16px 20px;
+  border-bottom: 2px solid var(--border);
+}
+.result-prop-title {
+  font-size: 13px; font-weight: 800; color: var(--text);
+  margin-bottom: 10px; line-height: 1.3;
+}
+.result-prop-chips {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 800; padding: 4px 10px;
+  border-radius: 99px; white-space: nowrap;
+}
+.chip-area { background: #EEF4FF; color: var(--blue); }
+.chip-station { background: #EEFAF7; color: var(--teal); }
+.chip-type { background: #F4EEFF; color: var(--purple); }
+.chip-room { background: #FFF4EC; color: var(--accent); }
+.chip-star { background: #FFFAEC; color: var(--gold); }
+.chip-superhost { background: linear-gradient(135deg,#FFF0B0,#FFE060); color: #8A6000; }
+
+.result-occ-row {
+  display: flex; align-items: center; gap: 10px; margin-top: 6px;
+}
+.result-occ-label { font-size: 11px; font-weight: 800; color: var(--muted); flex-shrink: 0; }
+.result-occ-bar-track {
+  flex: 1; height: 10px; background: var(--border);
+  border-radius: 99px; overflow: hidden;
+}
+.result-occ-bar-fill {
+  height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, var(--teal), var(--green));
+  transition: width 0.8s cubic-bezier(0.34,1.56,0.64,1);
+}
+.result-occ-pct {
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  color: var(--teal); flex-shrink: 0;
+}
+
+/* Result answer section */
+.result-answer { padding: 20px; }
+
+.result-verdict {
+  font-size: 30px; font-weight: 900; text-align: center;
+  margin-bottom: 18px; animation: pop 0.4s cubic-bezier(0.16,1,0.3,1);
+}
+
+.result-compare {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;
+}
+.result-box {
+  border: 2px solid var(--border); border-radius: var(--r-sm);
+  padding: 14px; text-align: center; background: var(--surface);
+}
+.result-box-label { font-size: 11px; color: var(--muted); font-weight: 700; margin-bottom: 6px; }
+.result-box-value { font-family: var(--mono); font-size: 22px; font-weight: 700; }
+.correct-price { color: var(--gold); }
+.your-price { color: var(--blue); }
+
+.result-error {
+  text-align: center; font-family: var(--mono); font-size: 13px;
+  color: var(--muted); margin-bottom: 12px;
+}
+.result-score-gained {
+  background: linear-gradient(135deg, #F0FFF8, #E0FFF4);
+  border: 2px solid #A8F0D8; border-radius: var(--r-sm);
+  padding: 12px; text-align: center; margin-bottom: 14px;
+  font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--green);
+}
+.result-airbnb-link {
+  display: block; text-align: center; font-size: 12px; font-weight: 700;
+  color: var(--muted); text-decoration: none; margin-bottom: 14px;
+  transition: color 0.2s;
+}
+.result-airbnb-link:hover { color: var(--accent); }
+.btn-next {
+  display: block; width: 100%; padding: 14px;
+  background: var(--surface); border: 2px solid var(--border);
+  color: var(--text); font-family: var(--sans); font-size: 15px; font-weight: 800;
+  letter-spacing: 0.04em; border-radius: var(--r-sm); cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.btn-next:hover { background: var(--bg); border-color: var(--accent); transform: translateY(-1px); }
+
+/* ─── FINAL SCREEN ─── */
+.final-screen {
+  display: none; min-height: 80vh;
+  align-items: center; justify-content: center;
+  flex-direction: column; padding: 40px 20px; text-align: center;
+}
+.final-screen.visible { display: flex; animation: fadeIn 0.5s ease; }
+.final-title { font-size: 34px; font-weight: 900; margin-bottom: 4px; }
+.final-subtitle { color: var(--muted); font-size: 14px; font-weight: 700; margin-bottom: 32px; }
+.final-score-ring {
+  width: 164px; height: 164px; border-radius: 50%;
+  border: 4px solid var(--border); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; margin: 0 auto 28px;
+  background: var(--card); position: relative;
+  box-shadow: 0 8px 32px rgba(255,92,56,0.15);
+}
+.final-score-ring::before {
+  content: ''; position: absolute; inset: -4px; border-radius: 50%;
+  border: 4px solid transparent;
+  border-top-color: var(--accent); border-right-color: var(--accent2);
+  animation: spin 2s linear infinite;
+}
+.final-score-num { font-family: var(--mono); font-size: 46px; font-weight: 700; color: var(--accent); line-height: 1; }
+.final-score-max { font-family: var(--mono); font-size: 13px; color: var(--muted); font-weight: 700; }
+.final-rank { font-size: 26px; font-weight: 900; margin-bottom: 8px; }
+.final-stats {
+  display: flex; gap: 14px; margin-bottom: 36px;
+  flex-wrap: wrap; justify-content: center;
+}
+.final-stat {
+  background: var(--card); border: 2px solid var(--border);
+  border-radius: var(--r-sm); padding: 14px 20px; min-width: 110px;
+}
+.final-stat-label { font-size: 11px; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
+.final-stat-value { font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--text); }
+.btn-replay {
+  padding: 16px 48px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff; font-family: var(--sans); font-size: 17px; font-weight: 900;
+  letter-spacing: 0.06em; border: none; border-radius: var(--r-sm);
+  cursor: pointer; box-shadow: 0 6px 24px rgba(255,92,56,0.35);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.btn-replay:hover { transform: translateY(-3px); box-shadow: 0 10px 32px rgba(255,92,56,0.5); }
+
+.btn-tweet {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 28px; margin-top: 12px;
+  background: #000; color: #fff;
+  font-family: var(--sans); font-size: 15px; font-weight: 800;
+  border: none; border-radius: var(--r-sm); cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+  text-decoration: none;
+}
+.btn-tweet:hover { background: #222; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+.btn-tweet svg { flex-shrink: 0; }
+
+.rank-table {
+  margin-top: 32px; width: 100%; max-width: 360px;
+  border: 2px solid var(--border); border-radius: var(--r-md);
+  overflow: hidden; background: var(--card);
+}
+.rank-table-title {
+  background: var(--bg); padding: 10px 16px;
+  font-size: 12px; font-weight: 800; color: var(--muted);
+  letter-spacing: 0.06em; border-bottom: 2px solid var(--border);
+}
+.rank-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; border-bottom: 1px dashed var(--border);
+  gap: 8px;
+}
+.rank-row:last-child { border-bottom: none; }
+.rank-row.current-rank {
+  background: linear-gradient(135deg, #FFF8EC, #FFF0D8);
+  border-left: 4px solid var(--accent);
+}
+.rank-row-score { font-family: var(--mono); font-size: 12px; color: var(--muted); font-weight: 700; flex-shrink: 0; }
+.rank-row-name { font-size: 13px; font-weight: 800; }
+
+/* ─── START SCREEN ─── */
+.start-screen {
+  display: none; min-height: 100vh;
+  align-items: center; justify-content: center;
+  flex-direction: column; padding: 40px 20px; text-align: center;
+  background: var(--bg);
+}
+.start-screen.visible { display: flex; animation: fadeIn 0.5s ease; }
+.start-hero {
+  width: 100%; max-width: 560px;
+  background: var(--card); border: 2px solid var(--border);
+  border-radius: var(--r-lg); overflow: hidden;
+  box-shadow: 0 12px 48px rgba(255,92,56,0.15);
+  margin-bottom: 32px;
+}
+.start-hero-img {
+  width: 100%; height: 300px; object-fit: cover; display: block;
+  background: linear-gradient(135deg, #FFE4D8, #FFC8A0);
+}
+.start-hero-body { padding: 28px 28px 32px; }
+.start-eyebrow {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.12em;
+  color: var(--accent); margin-bottom: 10px; text-transform: uppercase;
+}
+.start-title {
+  font-size: 26px; font-weight: 900; line-height: 1.3;
+  color: var(--text); margin-bottom: 12px;
+}
+.start-title span { color: var(--accent); }
+.start-desc {
+  font-size: 14px; color: var(--muted); font-weight: 500;
+  line-height: 1.7; margin-bottom: 24px;
+}
+.start-badges {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  justify-content: center; margin-bottom: 28px;
+}
+.start-badge {
+  background: var(--bg); border: 2px solid var(--border);
+  border-radius: 99px; padding: 6px 14px;
+  font-size: 12px; font-weight: 800; color: var(--text);
+}
+.btn-start {
+  display: block; width: 100%; padding: 18px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff; font-family: var(--sans); font-size: 18px; font-weight: 900;
+  letter-spacing: 0.06em; border: none; border-radius: var(--r-sm);
+  cursor: pointer; box-shadow: 0 6px 24px rgba(255,92,56,0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.btn-start:hover { transform: translateY(-3px); box-shadow: 0 10px 32px rgba(255,92,56,0.5); }
+
+/* ─── CREDIT ─── */
+.credit {
+  position: fixed; bottom: 8px; right: 12px; z-index: 50;
+  font-size: 12px; color: var(--muted); font-weight: 700;
+  opacity: 0.75; pointer-events: auto;
+}
+.credit a { color: var(--muted); text-decoration: none; }
+.credit a:hover { color: var(--accent); }
+
+/* LOADING */
+.loading-screen {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 60vh; gap: 14px; color: var(--muted); font-size: 14px; font-weight: 700;
+}
+.loading-spinner {
+  width: 40px; height: 40px; border: 3px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Leaflet */
+.leaflet-control-attribution { display: none !important; }
+.leaflet-control-zoom a {
+  background: var(--card) !important; color: var(--text) !important;
+  border-color: var(--border) !important; font-weight: 700 !important;
+}
+
+@media (max-width: 620px) {
+  .content-grid { grid-template-columns: 1fr; }
+  .photo-wrap { height: 220px; }
+  .price-number { font-size: 44px; }
+  #map { min-height: 200px; }
+}
+</style>
+</head>
+<body>
+
+<div class="credit">作成者：こじ　<a href="https://x.com/koji2406" target="_blank">@koji2406</a></div>
+
+<!-- Start Screen -->
+<div class="start-screen visible" id="start-screen">
+  <div class="start-hero">
+    <img class="start-hero-img" src="ogp.png" alt="東京単価検定"
+         onerror="this.style.background='linear-gradient(135deg,#FFE4D8,#FFC8A0)';this.style.height='220px'">
+    <div class="start-hero-body">
+      <div class="start-eyebrow">🏠 民泊ホスト向けクイズゲーム</div>
+      <div class="start-title">できるホストは<br>知っている<span>!?</span><br>東京単価検定</div>
+      <div class="start-desc">
+        東京の実際の民泊物件を見て、<br>
+        1泊あたりの単価を当てるゲームです。<br>
+        あなたの価格感覚、試してみて！
+      </div>
+      <div class="start-badges">
+        <span class="start-badge">📍 東京の物件</span>
+        <span class="start-badge">🏠 全5問</span>
+        <span class="start-badge">💰 500点満点</span>
+      </div>
+      <button class="btn-start" onclick="onStartClick()">🎯 挑戦する！</button>
+      <p style="margin-top:14px;font-size:10px;color:var(--muted);line-height:1.6;text-align:left;">※ Inside Airbnb公開の最新データ（2025年9月データ）に基づく金額です。</p>
+    </div>
+  </div>
+</div>
+
+<div class="header" id="main-header" style="display:none">
+  <div class="header-title">
+    <span class="full">🏠 できるホストは知っている!? 東京単価検定</span>
+    <span class="short">🏠 東京単価検定</span>
+  </div>
+  <div class="header-progress">
+    <div class="progress-label">
+      <span id="q-label">Q1 / 10</span>
+      <span id="q-pct">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+  </div>
+  <div class="header-score">
+    <div class="score-label">SCORE</div>
+    <div class="score-value" id="score-display">0</div>
+  </div>
+</div>
+
+<div class="game-wrap" id="game-wrap" style="display:none">
+  <div class="loading-screen" id="loading-screen">
+    <div class="loading-spinner"></div>データを読み込み中...
+  </div>
+</div>
+
+<!-- Result Overlay -->
+<div class="result-overlay" id="result-overlay">
+  <div class="result-panel">
+    <!-- 物件情報サマリー -->
+    <div class="result-prop-header" id="result-prop-header"></div>
+    <!-- 答え合わせ -->
+    <div class="result-answer">
+      <div class="result-verdict" id="result-verdict"></div>
+      <div class="result-compare">
+        <div class="result-box">
+          <div class="result-box-label">✅ 正解</div>
+          <div class="result-box-value correct-price" id="result-correct"></div>
+        </div>
+        <div class="result-box">
+          <div class="result-box-label">💭 あなた</div>
+          <div class="result-box-value your-price" id="result-yours"></div>
+        </div>
+      </div>
+      <div class="result-error" id="result-error"></div>
+      <div class="result-score-gained" id="result-score-gained"></div>
+      <a class="result-airbnb-link" id="result-link" href="#" target="_blank">▶ Airbnbで実際のリスティングを見る</a>
+      <button class="btn-next" id="btn-next">次の物件へ →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Final Screen -->
+<div class="final-screen" id="final-screen">
+  <div class="final-title">🏆 全問終了！</div>
+  <div class="final-subtitle">あなたの価格感覚を診断します</div>
+  <div class="final-score-ring">
+    <div class="final-score-num" id="final-score-num">0</div>
+    <div class="final-score-max">/ 500</div>
+  </div>
+  <div class="final-rank" id="final-rank"></div>
+  <div class="final-stats">
+    <div class="final-stat">
+      <div class="final-stat-label">平均誤差</div>
+      <div class="final-stat-value" id="final-avg-err">-</div>
+    </div>
+    <div class="final-stat">
+      <div class="final-stat-label">最高得点</div>
+      <div class="final-stat-value" id="final-best">-</div>
+    </div>
+    <div class="final-stat">
+      <div class="final-stat-label">最低得点</div>
+      <div class="final-stat-value" id="final-worst">-</div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+    <button class="btn-replay" onclick="startGame()">もう一度チャレンジ 🎯</button>
+    <a class="btn-tweet" id="btn-tweet" href="#" target="_blank">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      結果をポストする
+    </a>
+  </div>
+
+  <div class="rank-table">
+    <div class="rank-table-title">📊 判定基準</div>
+    <div class="rank-row" id="rank-r1"><span class="rank-row-score">450〜500</span><span class="rank-row-name">👑 天才ホスト</span></div>
+    <div class="rank-row" id="rank-r2"><span class="rank-row-score">375〜449</span><span class="rank-row-name">🏆 本物の価格感覚</span></div>
+    <div class="rank-row" id="rank-r3"><span class="rank-row-score">275〜374</span><span class="rank-row-name">📊 平均点ホスト</span></div>
+    <div class="rank-row" id="rank-r4"><span class="rank-row-score">175〜274</span><span class="rank-row-name">📚 要・相場勉強</span></div>
+    <div class="rank-row" id="rank-r5"><span class="rank-row-score">0〜174</span><span class="rank-row-name">🔰 まだまだひよっこ</span></div>
+  </div>
+
+  <div class="rank-table" style="margin-top:14px;">
+    <div class="rank-table-title">🎯 1問ごとの得点</div>
+    <div class="rank-row"><span class="rank-row-score">±5%以内</span><span class="rank-row-name">🎯 パーフェクト！&ensp;<small style="color:var(--muted);font-weight:700;">90〜100点</small></span></div>
+    <div class="rank-row"><span class="rank-row-score">±6〜15%</span><span class="rank-row-name">⭐ 素晴らしい！&ensp;<small style="color:var(--muted);font-weight:700;">70〜88点</small></span></div>
+    <div class="rank-row"><span class="rank-row-score">±16〜30%</span><span class="rank-row-name">👍 いい線いってる！&ensp;<small style="color:var(--muted);font-weight:700;">40〜68点</small></span></div>
+    <div class="rank-row"><span class="rank-row-score">±31〜50%</span><span class="rank-row-name">📊 まずまず…&ensp;<small style="color:var(--muted);font-weight:700;">1〜38点</small></span></div>
+    <div class="rank-row"><span class="rank-row-score">50%超</span><span class="rank-row-name">💪 修行が必要！&ensp;<small style="color:var(--muted);font-weight:700;">0点</small></span></div>
+  </div>
+</div>
+
+<script>
+const TOTAL_Q = 5;
+
+function onStartClick() {
+  document.getElementById('start-screen').classList.remove('visible');
+  document.getElementById('main-header').style.display = '';
+  startGame();
+}
+let listings = [], queue = [], current = null;
+let qNum = 0, totalScore = 0, scores = [], errors = [];
+let mapInstance = null, mapMarker = null;
+
+function sliderToPrice(v) {
+  const lo = Math.log(1000), hi = Math.log(180000);
+  return Math.round(Math.exp(lo + (v / 100) * (hi - lo)) / 100) * 100;
+}
+function fmtPrice(n) { return '¥' + n.toLocaleString('ja-JP'); }
+function fmtDiff(n) {
+  const s = n > 0 ? '+' : '';
+  return s + '¥' + n.toLocaleString('ja-JP');
+}
+
+function calcScore(guess, actual) {
+  const err = Math.abs(guess - actual) / actual;
+  return Math.max(0, Math.round(100 * Math.max(0, 1 - err * 2)));
+}
+function roomTypeJP(rt) {
+  if (!rt) return '—';
+  if (rt.includes('Entire')) return '一棟貸し';
+  if (rt.includes('Private')) return '個室';
+  if (rt.includes('Hotel')) return 'ホテル';
+  return '相部屋';
+}
+function verdict(err) {
+  if (err <= 0.05) return ['🎯 パーフェクト！', '#2CC48C'];
+  if (err <= 0.15) return ['⭐ 素晴らしい！', '#F0A820'];
+  if (err <= 0.30) return ['👍 いい線いってる！', '#4080FF'];
+  if (err <= 0.50) return ['📊 まずまず…', '#FF9500'];
+  return ['💪 修行が必要！', '#FF5C38'];
+}
+function finalRank(s) {
+  if (s >= 450) return ['👑 天才ホスト', '#F0A820'];
+  if (s >= 375) return ['🏆 本物の価格感覚', '#888'];
+  if (s >= 275) return ['📊 平均点ホスト', '#CD7F32'];
+  if (s >= 175) return ['📚 要・相場勉強', '#4080FF'];
+  return ['🔰 まだまだひよっこ', '#2CC48C'];
+}
+
+// 物件情報チップHTML（答え合わせ用）
+function buildPropSummary(l) {
+  const occPct = Math.min(100, Math.max(0, l.occupancy_pct));
+  const starsStr = l.rating ? `★ ${l.rating.toFixed(2)} (${l.reviews}件)` : '評価なし';
+  const roomStr = `${l.bedrooms ?? '?'}室 / ${l.beds ?? '?'}台 / ${l.accommodates ?? '?'}名`;
+  const superhostChip = l.is_superhost ? `<span class="chip chip-superhost">★ スーパーホスト</span>` : '';
+
+  return `
+    <div class="result-prop-title">${l.name}</div>
+    <div class="result-prop-chips">
+      <span class="chip chip-area">📍 ${l.neighbourhood || '—'}</span>
+      <span class="chip chip-station">🚉 ${l.nearest_station}駅 徒歩${l.walk_min}分</span>
+      <span class="chip chip-type">${roomTypeJP(l.room_type)}</span>
+      <span class="chip chip-room">🛏 ${roomStr}</span>
+      ${l.bathrooms ? `<span class="chip chip-room">🚿 ${l.bathrooms}</span>` : ''}
+      <span class="chip chip-star">${starsStr}</span>
+      ${superhostChip}
+    </div>
+    <div class="result-occ-row">
+      <span class="result-occ-label">稼働率</span>
+      <div class="result-occ-bar-track">
+        <div class="result-occ-bar-fill" id="r-occ-fill" style="width:0%"></div>
+      </div>
+      <span class="result-occ-pct">${occPct}%</span>
+    </div>
+    <div style="font-size:10px;color:var(--muted);font-weight:500;text-align:right;margin-top:3px;">※airbnbのみの参考値</div>
+  `;
+}
+
+function initMap(lat, lon) {
+  const jitter = () => (Math.random() - 0.5) * 0.006;
+  const jLat = lat + jitter(), jLon = lon + jitter();
+
+  if (mapInstance) { mapInstance.remove(); mapInstance = null; mapMarker = null; }
+
+  mapInstance = L.map('map', { zoomControl: true, scrollWheelZoom: false });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 18
+  }).addTo(mapInstance);
+
+  const icon = L.divIcon({
+    html: '<div style="width:18px;height:18px;border-radius:50%;background:#FF5C38;border:3px solid #fff;box-shadow:0 0 12px rgba(255,92,56,0.7);"></div>',
+    iconSize: [18,18], iconAnchor: [9,9], className: ''
+  });
+  mapMarker = L.marker([jLat, jLon], { icon }).addTo(mapInstance);
+  mapInstance.setView([jLat, jLon], 14);
+}
+
+function renderQuestion(listing) {
+  window.scrollTo(0, 0);
+  const wrap = document.getElementById('game-wrap');
+  const occPct = Math.min(100, Math.max(0, listing.occupancy_pct));
+  const starsHtml = listing.rating
+    ? `★ ${listing.rating.toFixed(2)} <span style="color:var(--muted)">(${listing.reviews}件)</span>`
+    : '<span style="color:var(--muted)">評価なし</span>';
+  const superhostHtml = listing.is_superhost
+    ? `<span class="badge badge-superhost">★ スーパーホスト</span>` : '—';
+
+  wrap.innerHTML = `
+    <div class="photo-wrap">
+      <div class="photo-loading" id="photo-loading">
+        <div class="photo-loading-spinner"></div>写真を読み込み中…
+      </div>
+      <img id="listing-photo" src="${listing.picture_url}" alt="物件写真" loading="eager"
+           onload="this.classList.add('loaded');document.getElementById('photo-loading').classList.add('hidden')"
+           onerror="this.classList.add('loaded');document.getElementById('photo-loading').classList.add('hidden')" />
+      <div class="photo-overlay">
+        <div class="listing-name">${listing.name}</div>
+      </div>
+    </div>
+
+    <div class="content-grid">
+      <div class="info-card">
+        <div class="info-row">
+          <span class="info-label">📍 エリア</span>
+          <span class="info-value">${listing.neighbourhood || '—'}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">🚉 最寄り駅</span>
+          <span class="info-value c-teal">${listing.nearest_station}駅 徒歩${listing.walk_min}分</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">🏠 タイプ</span>
+          <span class="info-value"><span class="badge badge-type">${roomTypeJP(listing.room_type)}</span></span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">🛏 寝室 / ベッド / 定員</span>
+          <span class="info-value">${listing.bedrooms ?? '—'}室 / ${listing.beds ?? '—'}台 / ${listing.accommodates ?? '—'}名</span>
+        </div>
+        ${listing.bathrooms ? `
+        <div class="info-row">
+          <span class="info-label">🚿 バスルーム</span>
+          <span class="info-value">${listing.bathrooms}</span>
+        </div>` : ''}
+        <div class="info-row">
+          <span class="info-label">⭐ 評価</span>
+          <span class="info-value c-gold">${starsHtml}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">🏅 スーパーホスト</span>
+          <span class="info-value">${superhostHtml}</span>
+        </div>
+        <div class="info-row" style="align-items:flex-start;padding-top:10px;">
+          <span class="info-label" style="padding-top:2px;">📊 稼働率</span>
+          <div class="occ-wrap">
+            <div class="occ-pct">${occPct}%</div>
+            <div class="occ-bar-track">
+              <div class="occ-bar-fill" id="occ-fill" style="width:0%"></div>
+            </div>
+            <div style="font-size:10px;color:var(--muted);font-weight:500;text-align:right;">※airbnbのみの参考値</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="map-card">
+        <div id="map"></div>
+        <div class="map-notice">※ 位置は概略です</div>
+      </div>
+    </div>
+
+    <div class="answer-card">
+      <div class="answer-title">この物件の <strong>1泊あたりの価格</strong> は？</div>
+      <div class="price-display">
+        <span class="price-currency">¥</span><span class="price-number" id="price-num">10,000</span><span class="price-unit">/ 泊</span>
+      </div>
+      <div class="slider-range"><span>¥1,000</span><span>¥180,000+</span></div>
+      <input type="range" id="price-slider" min="0" max="100" value="40" oninput="onSliderMove(this.value)">
+      <button class="btn-answer" id="btn-answer" onclick="submitAnswer()">💰 答える</button>
+    </div>
+  `;
+
+  document.getElementById('price-num').textContent = sliderToPrice(40).toLocaleString('ja-JP');
+
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      const fill = document.getElementById('occ-fill');
+      if (fill) fill.style.width = occPct + '%';
+    }, 200);
+  });
+
+  setTimeout(() => initMap(listing.lat, listing.lon), 100);
+}
+
+function onSliderMove(val) {
+  document.getElementById('price-num').textContent = sliderToPrice(parseFloat(val)).toLocaleString('ja-JP');
+}
+
+function submitAnswer() {
+  const sliderVal = parseFloat(document.getElementById('price-slider').value);
+  const guess = sliderToPrice(sliderVal);
+  const actual = current.price_jpy;
+  const err = Math.abs(guess - actual) / actual;
+  const pts = calcScore(guess, actual);
+
+  totalScore += pts;
+  scores.push(pts);
+  errors.push(err);
+  document.getElementById('score-display').textContent = totalScore;
+  document.getElementById('btn-answer').disabled = true;
+
+  // 物件情報サマリーを埋める
+  document.getElementById('result-prop-header').innerHTML = buildPropSummary(current);
+  setTimeout(() => {
+    const fill = document.getElementById('r-occ-fill');
+    if (fill) fill.style.width = Math.min(100, current.occupancy_pct) + '%';
+  }, 100);
+
+  // 答え合わせ内容
+  const [vText, vColor] = verdict(err);
+  document.getElementById('result-verdict').textContent = vText;
+  document.getElementById('result-verdict').style.color = vColor;
+  document.getElementById('result-correct').textContent = fmtPrice(actual);
+  document.getElementById('result-yours').textContent = fmtPrice(guess);
+  const diff = guess - actual;
+  document.getElementById('result-error').innerHTML =
+    `差額: <strong style="color:${diff > 0 ? '#FF5C38' : '#4080FF'}">${fmtDiff(diff)}</strong> &nbsp; 誤差: ${(err * 100).toFixed(1)}%`;
+  document.getElementById('result-score-gained').textContent = `今回の得点: +${pts} pts`;
+  document.getElementById('result-link').href = current.listing_url;
+
+  if (mapInstance) mapInstance.getContainer().style.visibility = 'hidden';
+  document.getElementById('result-overlay').classList.add('visible');
+}
+
+document.getElementById('btn-next').addEventListener('click', () => {
+  document.getElementById('result-overlay').classList.remove('visible');
+  if (mapInstance) mapInstance.getContainer().style.visibility = 'visible';
+  qNum++;
+  if (qNum >= TOTAL_Q) { showFinal(); return; }
+  updateProgress();
+  current = queue[qNum];
+  renderQuestion(current);
+});
+
+function updateProgress() {
+  const pct = (qNum / TOTAL_Q) * 100;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('q-label').textContent = `Q${qNum + 1} / ${TOTAL_Q}`;
+  document.getElementById('q-pct').textContent = Math.round(pct) + '%';
+}
+
+function showFinal() {
+  window.scrollTo(0, 0);
+  document.getElementById('progress-fill').style.width = '100%';
+  document.getElementById('q-label').textContent = `Q${TOTAL_Q} / ${TOTAL_Q}`;
+  document.getElementById('q-pct').textContent = '100%';
+  document.getElementById('game-wrap').style.display = 'none';
+  document.getElementById('final-screen').classList.add('visible');
+  document.getElementById('final-score-num').textContent = totalScore;
+  const avgErr = errors.reduce((a, b) => a + b, 0) / errors.length;
+  document.getElementById('final-avg-err').textContent = (avgErr * 100).toFixed(1) + '%';
+  document.getElementById('final-best').textContent = Math.max(...scores) + 'pt';
+  document.getElementById('final-worst').textContent = Math.min(...scores) + 'pt';
+  const [rankText, rankColor] = finalRank(totalScore);
+  const el = document.getElementById('final-rank');
+  el.textContent = rankText; el.style.color = rankColor;
+
+  // ツイートボタン
+  const tweetText = `【#東京リスティング単価当てクイズ】\n\n${rankText}\nスコア: ${totalScore} / 500点\n平均誤差: ${(avgErr * 100).toFixed(1)}%\n\nあなたも試してみて👇\nhttps://tokyo-minpakuhost-price-game.netlify.app/\n\n#Airbnb #民泊ホスト`;
+  document.getElementById('btn-tweet').href =
+    'https://twitter.com/intent/tweet?text=' + encodeURIComponent(tweetText);
+
+  // 現在ランクをハイライト
+  const rankIds = ['rank-r1','rank-r2','rank-r3','rank-r4','rank-r5'];
+  rankIds.forEach(id => document.getElementById(id).classList.remove('current-rank'));
+  const rankIndex = totalScore >= 450 ? 0 : totalScore >= 375 ? 1 : totalScore >= 275 ? 2 : totalScore >= 175 ? 3 : 4;
+  document.getElementById(rankIds[rankIndex]).classList.add('current-rank');
+}
+
+function startGame() {
+  qNum = 0; totalScore = 0; scores = []; errors = [];
+  if (mapInstance) { mapInstance.remove(); mapInstance = null; mapMarker = null; }
+  document.getElementById('start-screen').classList.remove('visible');
+  document.getElementById('main-header').style.display = '';
+  document.getElementById('final-screen').classList.remove('visible');
+  document.getElementById('game-wrap').style.display = 'block';
+  document.getElementById('score-display').textContent = '0';
+  const entireHomes = listings.filter(d => d.room_type && d.room_type.includes('Entire'));
+  const pick = (arr, n) => [...arr].sort(() => Math.random() - 0.5).slice(0, n);
+  queue = [...pick(listings, 2), ...pick(entireHomes, 3)];
+  current = queue[0];
+  updateProgress();
+  renderQuestion(current);
+}
+
+fetch('./data/listings_game.json')
+  .then(r => r.json())
+  .then(data => {
+    listings = data.filter(d => d.price_jpy >= 1000 && d.occupancy_pct > 0);
+    if (!listings.length) {
+      document.getElementById('loading-screen').innerHTML = '<div style="color:var(--accent)">データが見つかりません</div>';
+      return;
+    }
+    // データ読み込み完了 → スタート画面で待機
+    document.getElementById('loading-screen').style.display = 'none';
+  })
+  .catch(err => {
+    document.getElementById('loading-screen').innerHTML =
+      `<div style="color:var(--accent)">⚠️ 読み込みエラー<br><small>${err.message}</small></div>`;
+  });
+</script>
+</body>
+</html>
