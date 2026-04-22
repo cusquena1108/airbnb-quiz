@@ -7,12 +7,12 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="できるホストは知っている!? 東京単価検定">
 <meta property="og:description" content="東京の民泊物件を見て、1泊の単価を当てるゲーム。あなたのホスト価格センスを試してみて！">
-<meta property="og:url" content="https://tokyo-minpakuhost-price-game.netlify.app/">
-<meta property="og:image" content="https://tokyo-minpakuhost-price-game.netlify.app/ogp.png">
+<meta property="og:url" content="https://airbnb-quiz-iota.vercel.app/">
+<meta property="og:image" content="https://airbnb-quiz-iota.vercel.app/ogp.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="できるホストは知っている!? 東京単価検定">
 <meta name="twitter:description" content="東京の民泊物件を見て、1泊の単価を当てるゲーム。あなたのホスト価格センスを試してみて！">
-<meta name="twitter:image" content="https://tokyo-minpakuhost-price-game.netlify.app/ogp.png">
+<meta name="twitter:image" content="https://airbnb-quiz-iota.vercel.app/ogp.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -931,7 +931,7 @@ function showFinal() {
   el.textContent = rankText; el.style.color = rankColor;
 
   // ツイートボタン
-  const tweetText = `【#東京リスティング単価当てクイズ】\n\n${rankText}\nスコア: ${totalScore} / 500点\n平均誤差: ${(avgErr * 100).toFixed(1)}%\n\nあなたも試してみて👇\nhttps://tokyo-minpakuhost-price-game.netlify.app/\n\n#Airbnb #民泊ホスト`;
+  const tweetText = `【#東京リスティング単価当てクイズ】\n\n${rankText}\nスコア: ${totalScore} / 500点\n平均誤差: ${(avgErr * 100).toFixed(1)}%\n\nあなたも試してみて👇\nhttps://airbnb-quiz-iota.vercel.app/\n\n#Airbnb #民泊ホスト`;
   document.getElementById('btn-tweet').href =
     'https://twitter.com/intent/tweet?text=' + encodeURIComponent(tweetText);
 
